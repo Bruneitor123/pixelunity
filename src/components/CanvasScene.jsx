@@ -6,77 +6,48 @@ import { PixiPlugin } from 'gsap/PixiPlugin';
 gsap.registerPlugin(PixiPlugin);
 PixiPlugin.registerPIXI(PIXI);
 
-// Crisp pixel scaling
-PIXI.Application.RESOLUTION = window.devicePixelRatio || 1;
-PIXI.Application.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
-PIXI.Application.ROUND_PIXELS = true;
-
-function coverSprite(sprite, screenWidth, screenHeight) {
-    const tex = sprite.texture;
-    const ratio = tex.width / tex.height;
-    const screenRatio = screenWidth / screenHeight;
-    let scale;
-    if (screenRatio > ratio) {
-        scale = screenWidth / tex.width;
-    } else {
-        scale = screenHeight / tex.height;
-    }
-    sprite.scale.set(scale);
-    sprite.x = screenWidth / 2;
-    sprite.y = screenHeight / 2;
-}
-
+// Pixel art settings
+PIXI.Application.autoDensity = true;
+PIXI.Application.resolution = window.devicePixelRatio || 1;
+PIXI.Application.roundPixels = true;
+PIXI.Application.scaleMode = "nearest";
 
 export default function CanvasScene() {
     const canvasRef = useRef(null);
     const clicked = useRef(false);
-    const textSprite = useRef(null);
 
     useEffect(() => {
         async function setup() {
             const view = canvasRef.current;
             if (!view) return;
 
-            const app = new PIXI.Application({ view, resizeTo: window, backgroundColor: 0x111111 });
-            await app.init({ view, resizeTo: window, backgroundColor: 0x111111 });
+            const app = new PIXI.Application();
+            await app.init({ view: view, resizeTo: window });
 
-            // Load and display blocky initial image
-            const tex = await PIXI.Assets.load('/assets/full.png');
-            const sprite = PIXI.Sprite.from(tex);
+            const frames = [];
+            for (let i = 0; i < 59; i++) {
+                frames.push(await PIXI.Assets.load(`/assets/frame_${i.toString().padStart(2,'0')}_delay-0.1s.png`));
+            }
+
+            const sprite = new PIXI.AnimatedSprite(frames);
             sprite.anchor.set(0.5);
-            coverSprite(sprite, app.screen.width, app.screen.height);
-            sprite.scale.x *= 8; // for pixelated zoom-in
-            sprite.scale.y *= 8;
+            sprite.position.set(app.screen.width / 2, app.screen.height / 2);
+            sprite.scale.set(8);
             sprite.alpha = 0;
+            sprite.animationSpeed = 0.1;
+            sprite.play();
             app.stage.addChild(sprite);
 
-            gsap.to(sprite, { pixi: { alpha: 1 }, duration: 0.6 });
+            gsap.to(sprite, { pixi: { alpha: 1 }, duration: 0.8 });
 
-
-            // Add click instruction text
-            const text = new PIXI.Text('Click anywhere to zoom out', {
-                fontFamily: 'Arial',
-                fontSize: 28,
-                fill: 0xffffff,
-                align: 'center',
-            });
-            text.anchor.set(0.5);
-            text.x = app.screen.width / 2;
-            text.y = app.screen.height * 0.8;
-            text.alpha = 0;
-            app.stage.addChild(text);
-            textSprite.current = text;
-
-            gsap.to(text, { alpha: 1, duration: 1, repeat: -1, yoyo: true });
-
-            view.addEventListener('click', async () => {
+            // Add click anywhere handler to zoom out
+            view.addEventListener('pointerdown', async () => {
                 if (clicked.current) return;
                 clicked.current = true;
 
-                // Hide instruction
-                gsap.to(text, { alpha: 0, duration: 0.5 });
+                // optional fade text if added previously
+                // gsap.to(textRef.current, { pixi: { alpha: 0 }, duration: 0.5 });
 
-                // Zoom-out animation
                 await gsap.to(sprite, {
                     pixi: {
                         scaleX: sprite.scale.x / 8,
@@ -93,15 +64,8 @@ export default function CanvasScene() {
         setup();
     }, []);
 
-    // Called after zoom completes
     function onZoomComplete(app, sprite) {
-        // app.stage.removeChild(sprite);
-        app.stage.removeChild(textSprite.current);
-
-        // Example: Replace sprite with video, or start pixel war logic here.
-        // e.g., const videoTexture = PIXI.Texture.from('path/to/video.mp4');
-        //       const videoSprite = new PIXI.Sprite(videoTexture);
-        //       app.stage.addChild(videoSprite);
+        console.log('zoom complete - proceed with backend logic');
     }
 
     return <canvas ref={canvasRef} className="fixed inset-0" />;
